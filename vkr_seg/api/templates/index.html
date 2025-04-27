@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сегментация опухоли мозга</title>
+    <style>
+        body { background: #f4f6fa; font-family: 'Segoe UI', Arial, sans-serif; color: #222; margin: 0; }
+        .container { max-width: 480px; margin: 40px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px #0001; padding: 32px; }
+        h2 { text-align: center; color: #2a4d69; font-size: 1.6em; }
+        form { display: flex; flex-direction: column; gap: 18px; }
+        .file-zone { 
+            padding: 24px 16px; 
+            border-radius: 10px; 
+            border: 2px dashed #ccc; 
+            font-size: 1em; 
+            background: #fafbfc; 
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .file-zone.drag-over {
+            background: #ebf6ff;
+            border-color: #2a4d69;
+        }
+        .file-zone span {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+        }
+        .file-zone small {
+            display: block;
+            margin-top: 8px;
+            color: #888;
+        }
+        input[type=file] { 
+            position: absolute;
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .preview-container {
+            display: none;
+            margin-top: 16px;
+        }
+        .preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+        }
+        button { background: #2a4d69; color: #fff; border: none; border-radius: 10px; padding: 16px; font-size: 1.15em; cursor: pointer; transition: background 0.2s, box-shadow 0.2s; box-shadow: 0 2px 8px #0001; }
+        button:active { background: #1e3550; box-shadow: 0 1px 4px #0002; }
+        .result-img { display: block; margin: 24px auto 0; max-width: 100%; border-radius: 12px; box-shadow: 0 2px 8px #0002; }
+        .error { color: #c0392b; text-align: center; margin-top: 12px; font-size: 1.1em; }
+        .success { color: #27ae60; text-align: center; margin-top: 12px; font-size: 1.1em; }
+        @media (max-width: 600px) {
+            .container { max-width: 98vw; margin: 0.5em auto; padding: 16px; border-radius: 8px; }
+            h2 { font-size: 1.2em; }
+            button, .file-zone { font-size: 1em; }
+            button { padding: 12px 6px; border-radius: 8px; }
+        }
+        @media (max-width: 400px) {
+            .container { padding: 6vw 2vw; }
+            h2 { font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>Сегментация опухоли мозга</h2>
+    <form method="post" enctype="multipart/form-data" id="upload-form">
+        <div id="drop-zone" class="file-zone">
+            <span>Перетащите изображение МРТ сюда</span>
+            или
+            <input id="file-input" name="file" type="file" accept="image/*" required>
+            <label for="file-input">Выберите файл</label>
+            <small>Также можно вставить изображение из буфера обмена (Ctrl+V)</small>
+        </div>
+        <div id="preview-container" class="preview-container">
+            <img id="preview-img" class="preview-img" src="#" alt="Предпросмотр">
+        </div>
+        <button type="submit">Сегментировать</button>
+    </form>
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    {% if result_img %}
+        <div class="success">Сегментация выполнена!</div>
+        <img src="{{ result_img }}" class="result-img"/>
+    {% endif %}
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImg = document.getElementById('preview-img');
+    const form = document.getElementById('upload-form');
+
+    // Функция для обработки выбранного файла
+    function handleFiles(files) {
+        if (files.length) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // Создаем новый файл для input
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            }
+        }
+    }
+
+    // Подсветка при перетаскивании
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        }, false);
+    });
+
+    // Обработка файлов при перетаскивании
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        handleFiles(e.dataTransfer.files);
+    });
+
+    // Обработка при выборе файла через диалог
+    fileInput.addEventListener('change', () => {
+        handleFiles(fileInput.files);
+    });
+
+    // Вставка из буфера обмена
+    document.addEventListener('paste', (e) => {
+        if (e.clipboardData && e.clipboardData.files.length) {
+            e.preventDefault();
+            handleFiles(e.clipboardData.files);
+        }
+    });
+
+    // Клик на зону для активации выбора файла
+    dropZone.addEventListener('click', (e) => {
+        if (e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+</script>
+</body>
+</html> 
